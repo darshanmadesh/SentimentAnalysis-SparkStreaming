@@ -3,7 +3,7 @@ from pyspark.streaming import StreamingContext
 import json
 
 
-sc = SparkContext("local[*]", "recieveData")
+sc = SparkContext("local[2]", "recieveData")
 # Create a streaming context
 ssc = StreamingContext(sc, 1)
 
@@ -12,18 +12,12 @@ lines = ssc.socketTextStream("localhost", 6100)
 
 
 def todf(rdd):
+	# json to dict
     rdd = rdd.map(lambda x : json.loads(x))
-    data = rdd.collect()
-    for row in data:
-        print(row)
-
-def readMyStream(rdd):
-  if not rdd.isEmpty():
-    df = spark.read.json(rdd)
-    print('Started the Process')
-    print('Selection of Columns')
-    df = df.select('t1','t2','t3','timestamp').where(col("timestamp").isNotNull())
-    df.show()
+    # get only the instance as list
+    rdd = rdd.flatMap(lambda d: list(d[k] for k in d))
+    rdd = rdd.map(lambda d: list(d[k] for k in d))
+    
 
 
 lines.foreachRDD(todf)
