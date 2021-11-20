@@ -61,11 +61,12 @@ def spacing_punctuation(text):
             text = text.replace(punc, f' {punc} ')
     return text
 
-def CleanData(text):
+def cleanData(text):
     text = remove_emoji(text)
     text = remove_url(text)
     text = contractions.fix(text)
     text = remove_non_ascii(text)
     text = spacing_punctuation(text)
+    text = text.lower()
     return text
 
