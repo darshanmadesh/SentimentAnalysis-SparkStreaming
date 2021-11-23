@@ -1,5 +1,14 @@
 import re, string, unicodedata
 import contractions
+import nltk
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords, wordnet
+
+# download these once if not present
+#nltk.download('punkt')
+#nltk.download('stopwords')
+#nltk.download('wordnet')
+#nltk.download('averaged_perceptron_tagger')
 
 # removing emojis
 def remove_emoji(text):
@@ -70,3 +79,22 @@ def cleanData(text):
     text = text.lower()
     return text
 
+lemmatizer = WordNetLemmatizer()
+
+def pos_tagger(word):
+	tag = nltk.pos_tag([word])[0][1][0].upper()
+	tag_dict = {
+		"J" : wordnet.ADJ,
+		"N" : wordnet.NOUN,
+		"V" : wordnet.VERB,
+		"R" : wordnet.ADV
+	}
+	return tag_dict.get(tag, wordnet.NOUN)
+
+def lemmatizeData(text):
+	# first clean the data
+	text = cleanData(text)
+	words = nltk.word_tokenize(text)
+	words = [lemmatizer.lemmatize(word, pos_tagger(word)) for word in words if word not in set(stopwords.words('english'))]
+	return " ".join(words)
+	

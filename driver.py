@@ -37,12 +37,14 @@ def process(rdd):
 		#data cleaning
 		# convert rdd to dataframe and get the cleaned data.
 		df = rdd.map(lambda x : (x[0], x[1])).toDF(("target", "text"))
-		cleanDataUDF = udf(clean.cleanData)
-		df = df.withColumn("clean_text", cleanDataUDF(df.text))
-		
-		# collect clean text & target as ndarray
+		lemmatizeDataUDF = udf(clean.lemmatizeData)
+		df = df.withColumn("lemmatized_text", lemmatizeDataUDF(df.text))
+		df.show()
+		# collect lemmatized text & target as ndarray
 		sentiment = np.array([int(row['target']) for row in df.collect()])
-		text = np.array([str(row['clean_text']) for row in df.collect()])
+		text = np.array([str(row['lemmatized_text']) for row in df.collect()])
+		
+		
 		
 		
 		
