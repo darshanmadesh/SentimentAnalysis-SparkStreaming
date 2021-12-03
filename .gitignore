@@ -2,4 +2,4 @@
 *.csv
 Rough/
 __pycache__
-stream.py
+*stream.py
