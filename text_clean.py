@@ -67,7 +67,7 @@ all_punct = list(set(regular_punct + extra_punct))
 def spacing_punctuation(text):
     for punc in all_punct:
         if punc in text:
-            text = text.replace(punc, f' {punc} ')
+            text = text.replace(punc, f'')
     return text
 
 def cleanData(text):

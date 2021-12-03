@@ -47,17 +47,11 @@ def process(rdd):
 		# collect lemmatized text & target as ndarray
 		sentiment = np.array([int(row['target']) for row in df.collect()])
 		text = np.array([str(row['lemmatized_text']) for row in df.collect()])
+		print(len(text))
 		
 		X_text = vectorizer.transform(text)
 		
-		X_train, X_test, y_train, y_test = train_test_split(X_text, sentiment, test_size=0.15)
-		
-		
-		
-		classifier.partial_fit(X_train, y_train, classes=all_classes)
-		
-		
-		print(classifier.score(X_test, y_test))
+		classifier.partial_fit(X_text, sentiment, classes=all_classes)
 		
 		
 		
@@ -65,22 +59,22 @@ def process(rdd):
 		
 		#return rdd
 
-		
-#create sparkcontext and the streaming context
-sc = SparkContext("local[2]", "recieveData")
-ssc = StreamingContext(sc, 1)
+if __name__ == '__main__':
+	#create sparkcontext and the streaming context
+	sc = SparkContext("local[2]", "recieveData")
+	ssc = StreamingContext(sc, 1)
 
-#read the socket data 
-lines = ssc.socketTextStream("localhost", 6100)
+	#read the socket data 
+	lines = ssc.socketTextStream("localhost", 6100)
 
-vectorizer = HashingVectorizer( decode_error='ignore', n_features=2**18, alternate_sign=False )
-all_classes = np.array([0, 4])
-classifier = SGDClassifier()
-
-
-lines.foreachRDD(process)
+	vectorizer = HashingVectorizer( decode_error='ignore', n_features=2**18, alternate_sign=False )
+	all_classes = np.array([0, 4])
+	classifier = SGDClassifier()
 
 
+	lines.foreachRDD(process)
 
-ssc.start()
-ssc.awaitTermination()
+
+
+	ssc.start()
+	ssc.awaitTermination()
