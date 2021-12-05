@@ -12,7 +12,7 @@ import text_clean as clean
 
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.linear_model import SGDClassifier
-from sklearn.model_selection import train_test_split
+import joblib
 
 
 def getSparkSessionInstance(sparkConf):
@@ -51,7 +51,8 @@ def process(rdd):
 		
 		X_text = vectorizer.transform(text)
 		
-		classifier.partial_fit(X_text, sentiment, classes=all_classes)
+		print(sgdModel1.score(X_text, sentiment))
+		print(sgdModel2.score(X_text, sentiment))
 		
 		
 		
@@ -69,7 +70,9 @@ if __name__ == '__main__':
 
 	vectorizer = HashingVectorizer( decode_error='ignore', n_features=2**18, alternate_sign=False )
 	all_classes = np.array([0, 4])
-	classifier = SGDClassifier()
+	
+	sgdModel1 = joblib.load("SGD1.pkl")
+	sgdModel2 = joblib.load("SGD2.pkl")
 
 
 	lines.foreachRDD(process)
@@ -77,4 +80,6 @@ if __name__ == '__main__':
 
 
 	ssc.start()
-	ssc.awaitTermination()
+	ssc.awaitTermination(timeout=60*3)
+	
+	ssc.stop(stopGraceFully=True)
