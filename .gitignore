@@ -3,3 +3,4 @@
 Rough/
 __pycache__
 *stream.py
+*.pkl
