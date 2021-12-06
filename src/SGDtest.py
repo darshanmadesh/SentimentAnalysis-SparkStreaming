@@ -1,22 +1,23 @@
+#spark dependencies
 from pyspark.sql import SparkSession
 from pyspark import SparkContext
 from pyspark.streaming import StreamingContext
 from pyspark.sql.functions import udf
 from pyspark.sql.types import StringType
-
+#data cleaning dependencies
 import json
 import nltk
-import numpy as np
-
 import text_clean as clean
-
+# learning dependencies
+import numpy as np
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.linear_model import SGDClassifier
 import joblib
-
 from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score
+#plotting dependencies
+import matplotlib.pyplot as plt
 
-
+#function to make sure only a single sparksession in global space
 def getSparkSessionInstance(sparkConf):
 	if ("sparkSessionSingletonInstance" not in globals()):
 		globals()["sparkSessionSingletonInstance"] = SparkSession\
@@ -25,9 +26,10 @@ def getSparkSessionInstance(sparkConf):
 			.getOrCreate()
 	return globals()["sparkSessionSingletonInstance"]
 
-
-def process(rdd):
+# main function to read, clean, preprocess and evaluate scores
+def process(time, rdd):
 	if not rdd.isEmpty():
+		print(f"======== {time} ========")
 	
 		spark = getSparkSessionInstance(rdd.context.getConf())
 		
@@ -45,21 +47,16 @@ def process(rdd):
 		df = rdd.map(lambda x : (x[0], x[1])).toDF(("target", "text"))
 		lemmatizeDataUDF = udf(clean.lemmatizeData)
 		df = df.withColumn("lemmatized_text", lemmatizeDataUDF(df.text))
-		#df.show()
+		
 
 		# collect lemmatized text & target as ndarray
 		sentiment = np.array([int(row['target']) for row in df.collect()])
 		text = np.array([str(row['lemmatized_text']) for row in df.collect()])
 		
 		print(f"batch size : {len(text)}")
-		#print(f"type : {text.dtype}")
 		
 		# vectorize cleaned text using hashing vectorizer
 		X_test = vectorizer.transform(text)
-		print(f"type : {X_test.dtype}")
-		print(f"shape : {X_test.shape}")
-		print(f"sentiment type : {sentiment.dtype}")
-		print(f"sentiment shape : {sentiment.shape}")
 		
 		
 		
@@ -135,10 +132,17 @@ if __name__ == '__main__':
 
 
 	ssc.start()
-	ssc.awaitTermination(timeout=60*5)
+	ssc.awaitTermination(timeout=60*8)
 	
 	ssc.stop(stopGraceFully=True)
 	
-	print(X_test_complete.shape)
+	print("all scores calculated")
+	
+	for cls_name, cls in sgd_models.items():
+	    print(f"{cls_name} :")
+	    print(f" accuracy : {cls['scores']['accuracy']}")
+	    print(f" recall : {cls['scores']['recall']}")
+	    print(f" precision : {cls['scores']['precision']}")
+	    print(f" f1 : {cls['scores']['f1']}")
 	
 	
