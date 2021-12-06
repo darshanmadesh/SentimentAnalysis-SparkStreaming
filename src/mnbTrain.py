@@ -11,7 +11,7 @@ import numpy as np
 import text_clean as clean
 
 from sklearn.feature_extraction.text import HashingVectorizer
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.naive_bayes import MultinomialNB
 import joblib
 
 
@@ -36,8 +36,7 @@ def process(time, rdd):
 		# get only the instance as list
 		rdd = rdd.flatMap(lambda d: list(d[k] for k in d))
 		rdd = rdd.map(lambda d: list(d[k] for k in d))
-		rdd = rdd.map(lambda i:[1, i[1]] if i[0] == 4 else [0, i[1]])
-		
+		rdd = rdd.map(lambda i:[1,i[1]] if i[0] == 4 else [0,i[1]])
 		#data cleaning & preprocessing -
 		
 		# convert rdd to dataframe and get the cleaned & lemmatized data.
@@ -49,13 +48,14 @@ def process(time, rdd):
 		sentiment = np.array([int(row['target']) for row in df.collect()])
 		text = np.array([str(row['lemmatized_text']) for row in df.collect()])
 		
-		print(f"batch size : {len(text)} ")
+		print(len(text))
 		
 		# vectorize the text using hashing vectorizer
 		X_text = vectorizer.transform(text)
 		
 		# partially fit the batch
-		kmeans.partial_fit(X_text)
+		for cls_name, cls in mnb_classifiers.items():
+			cls.partial_fit(X_text, sentiment, classes=np.unique(sentiment))
 			
 		
 		
@@ -64,21 +64,26 @@ def process(time, rdd):
 
 if __name__ == '__main__':
 	#create sparkcontext and the streaming context
-	sc = SparkContext("local[2]", "Clustering")
+	sc = SparkContext("local[2]", "MNBClassifier")
 	ssc = StreamingContext(sc, 1)
 
 	#read the socket data 
 	lines = ssc.socketTextStream("localhost", 6100)
 	
 	# Create the vectorizer
-	vectorizer = HashingVectorizer( decode_error='ignore', n_features=10000, alternate_sign=False )
+	vectorizer = HashingVectorizer( decode_error='ignore', n_features=2**20, alternate_sign=False )
 	
-	#all_classes = np.array([0, 4])
+	all_classes = np.array([0, 4])
 	
-	# create the Kmeans classifier
-	kmeans =  MiniBatchKMeans(n_clusters=2, init="k-means++")
+	# create Multinimial Naive Bayes Classifiers
+	mnb_classifiers = {
+		"MNB1" : MultinomialNB( alpha = 1.0, fit_prior = True, class_prior = None ),
+		"MNB2" : MultinomialNB( alpha = 2.0, fit_prior = True, class_prior = None ),
+		"MNB3" : MultinomialNB( alpha = 3.0, fit_prior = True, class_prior = None ),
+		"MNB4" : MultinomialNB( alpha = 4.0, fit_prior = True, class_prior = None )
+	}
 
-	#call the process method on each rdd of the Dstream
+
 	lines.foreachRDD(process)
 	
 
@@ -91,8 +96,9 @@ if __name__ == '__main__':
 	ssc.stop(stopGraceFully=True)
 	
 	
-	joblib.dump(kmeans, "kmeans.pkl")
-	print("kmeans saved successfully!!!")
+	for cls_name, cls in mnb_classifiers.items():
+		joblib.dump(cls, f"{cls_name}.pkl")
+		print(f"{cls_name} saved successfully!!!")
 		
 	
 	
