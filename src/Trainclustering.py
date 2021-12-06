@@ -11,7 +11,7 @@ import numpy as np
 import text_clean as clean
 
 from sklearn.feature_extraction.text import HashingVectorizer
-from sklearn.linear_model import SGDClassifier
+from sklearn.cluster import MiniBatchKMeans
 import joblib
 
 
@@ -55,8 +55,7 @@ def process(time, rdd):
 		X_text = vectorizer.transform(text)
 		
 		# partially fit the batch
-		for cls_name, cls in sgd_classifiers.items():
-			cls.partial_fit(X_text, sentiment, classes=np.unique(sentiment))
+		kmeans.partial_fit(X_text)
 			
 		
 		
@@ -65,24 +64,19 @@ def process(time, rdd):
 
 if __name__ == '__main__':
 	#create sparkcontext and the streaming context
-	sc = SparkContext("local[2]", "SGDClassifier")
+	sc = SparkContext("local[2]", "Clustering")
 	ssc = StreamingContext(sc, 1)
 
 	#read the socket data 
 	lines = ssc.socketTextStream("localhost", 6100)
 	
 	# Create the vectorizer
-	vectorizer = HashingVectorizer( decode_error='ignore', n_features=2**20, alternate_sign=False )
+	vectorizer = HashingVectorizer( decode_error='ignore', n_features=10000, alternate_sign=False )
 	
-	all_classes = np.array([0, 4])
+	#all_classes = np.array([0, 4])
 	
-	# create SGD Classifiers
-	sgd_classifiers = {
-		"SGD1" : SGDClassifier(loss='hinge', alpha=0.0001),
-		"SGD2" : SGDClassifier(loss='log', alpha=0.0001),
-		"SGD3" : SGDClassifier(loss='hinge', alpha=0.001),
-		"SGD4" : SGDClassifier(loss='hinge', alpha=0.00001)
-	}
+	# create the Kmeans classifier
+	kmeans =  MiniBatchKMeans(n_clusters=2, init="k-means++")
 
 	#call the process method on each rdd of the Dstream
 	lines.foreachRDD(process)
@@ -92,14 +86,13 @@ if __name__ == '__main__':
 	
 	
 	# wait for streaming to finish
-	ssc.awaitTermination(timeout=60*18)
+	ssc.awaitTermination(timeout=60*20)
 	
 	ssc.stop(stopGraceFully=True)
 	
 	
-	for cls_name, cls in sgd_classifiers.items():
-		joblib.dump(cls, f"{cls_name}.pkl")
-		print(f"{cls_name} saved successfully!!!")
+	joblib.dump(kmeans, "kmeans.pkl")
+	print("kmeans saved successfully!!!")
 		
 	
 	

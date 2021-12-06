@@ -13,9 +13,8 @@ import numpy as np
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.linear_model import SGDClassifier
 import joblib
-from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score
-#plotting dependencies
-import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, confusion_matrix
+
 
 #function to make sure only a single sparksession in global space
 def getSparkSessionInstance(sparkConf):
@@ -64,10 +63,10 @@ def process(time, rdd):
 		# predict and get various performance metrics
 		for cls_name, cls in sgd_models.items():
 			pred = cls["model"].predict(X_test)
-			cls["scores"]["accuracy"].append(accuracy_score(sentiment, pred))
-			cls["scores"]["precision"].append(precision_score(sentiment, pred))
-			cls["scores"]["recall"].append(recall_score(sentiment, pred))
-			cls["scores"]["f1"].append(f1_score(sentiment, pred))
+			cls["scores"]["accuracy"].append(round(accuracy_score(sentiment, pred), 4))
+			cls["scores"]["precision"].append(round(precision_score(sentiment, pred), 4))
+			cls["scores"]["recall"].append(round(recall_score(sentiment, pred), 4))
+			cls["scores"]["f1"].append(round(f1_score(sentiment, pred), 4))
 			#print(f"{cls_name} : {cls['scores']}")
 		
 		
@@ -90,7 +89,7 @@ if __name__ == '__main__':
 				"accuracy" : [],
 				"precision" : [],
 				"recall" : [],
-				"f1" :  []
+				"f1" :  [],
 			}
 		},
 		"SGD2" : {
@@ -99,7 +98,7 @@ if __name__ == '__main__':
 				"accuracy" : [],
 				"precision" : [],
 				"recall" : [],
-				"f1" :  []
+				"f1" :  [],
 			}
 		},
 		"SGD3" : {
@@ -108,7 +107,7 @@ if __name__ == '__main__':
 				"accuracy" : [],
 				"precision" : [],
 				"recall" : [],
-				"f1" :  []
+				"f1" :  [],
 			}
 		},
 		"SGD4" : {
@@ -117,7 +116,7 @@ if __name__ == '__main__':
 				"accuracy" : [],
 				"precision" : [],
 				"recall" : [],
-				"f1" :  []
+				"f1" :  [],
 			}
 		}
 	}
@@ -138,11 +137,16 @@ if __name__ == '__main__':
 	
 	print("all scores calculated")
 	
-	for cls_name, cls in sgd_models.items():
-	    print(f"{cls_name} :")
-	    print(f" accuracy : {cls['scores']['accuracy']}")
-	    print(f" recall : {cls['scores']['recall']}")
-	    print(f" precision : {cls['scores']['precision']}")
-	    print(f" f1 : {cls['scores']['f1']}")
+	export_dict = {
+		"SGD1" : sgd_models["SGD1"]['scores'],
+		"SGD2" : sgd_models["SGD2"]['scores'],
+		"SGD3" : sgd_models["SGD3"]['scores'],
+		"SGD4" : sgd_models["SGD4"]['scores'],
+	}
+	
+	with open("sgd_metrics.json", "w") as outfile:
+		json.dump(export_dict, outfile)
+		
+	print("all metrics saved")
 	
 	
