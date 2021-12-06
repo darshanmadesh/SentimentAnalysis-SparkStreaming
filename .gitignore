@@ -5,3 +5,4 @@ __pycache__
 *stream.py
 *.pkl
 *.json
+*.png
