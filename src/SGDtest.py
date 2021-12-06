@@ -14,6 +14,8 @@ from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.linear_model import SGDClassifier
 import joblib
 
+from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score
+
 
 def getSparkSessionInstance(sparkConf):
 	if ("sparkSessionSingletonInstance" not in globals()):
@@ -24,10 +26,9 @@ def getSparkSessionInstance(sparkConf):
 	return globals()["sparkSessionSingletonInstance"]
 
 
-def process(time, rdd):
+def process(rdd):
 	if not rdd.isEmpty():
-		print(f"======== {time} ========")
-		
+	
 		spark = getSparkSessionInstance(rdd.context.getConf())
 		
 	    	# json to dict
@@ -38,69 +39,106 @@ def process(time, rdd):
 		rdd = rdd.map(lambda d: list(d[k] for k in d))
 		rdd = rdd.map(lambda i:[1, i[1]] if i[0] == 4 else [0, i[1]])
 		
-		#data cleaning & preprocessing -
-		
-		# convert rdd to dataframe and get the cleaned & lemmatized data.
+		# Data cleaning and preprocessing -
+		#data cleaning
+		# convert rdd to dataframe and get the cleaned data.
 		df = rdd.map(lambda x : (x[0], x[1])).toDF(("target", "text"))
 		lemmatizeDataUDF = udf(clean.lemmatizeData)
 		df = df.withColumn("lemmatized_text", lemmatizeDataUDF(df.text))
-		
+		#df.show()
+
 		# collect lemmatized text & target as ndarray
 		sentiment = np.array([int(row['target']) for row in df.collect()])
 		text = np.array([str(row['lemmatized_text']) for row in df.collect()])
 		
-		print(f"batch size : {len(text)} ")
+		print(f"batch size : {len(text)}")
+		#print(f"type : {text.dtype}")
 		
-		# vectorize the text using hashing vectorizer
-		X_text = vectorizer.transform(text)
+		# vectorize cleaned text using hashing vectorizer
+		X_test = vectorizer.transform(text)
+		print(f"type : {X_test.dtype}")
+		print(f"shape : {X_test.shape}")
+		print(f"sentiment type : {sentiment.dtype}")
+		print(f"sentiment shape : {sentiment.shape}")
 		
-		# partially fit the batch
-		for cls_name, cls in sgd_classifiers.items():
-			cls.partial_fit(X_text, sentiment, classes=np.unique(sentiment))
-			
 		
+		
+		
+		# predict and get various performance metrics
+		for cls_name, cls in sgd_models.items():
+			pred = cls["model"].predict(X_test)
+			cls["scores"]["accuracy"].append(accuracy_score(sentiment, pred))
+			cls["scores"]["precision"].append(precision_score(sentiment, pred))
+			cls["scores"]["recall"].append(recall_score(sentiment, pred))
+			cls["scores"]["f1"].append(f1_score(sentiment, pred))
+			#print(f"{cls_name} : {cls['scores']}")
 		
 		
 		
 
 if __name__ == '__main__':
 	#create sparkcontext and the streaming context
-	sc = SparkContext("local[2]", "SGDClassifier")
+	sc = SparkContext("local[2]", "recieveData")
 	ssc = StreamingContext(sc, 1)
 
 	#read the socket data 
 	lines = ssc.socketTextStream("localhost", 6100)
-	
-	# Create the vectorizer
+
 	vectorizer = HashingVectorizer( decode_error='ignore', n_features=2**20, alternate_sign=False )
 	
-	all_classes = np.array([0, 4])
-	
-	# create SGD Classifiers
-	sgd_classifiers = {
-		"SGD1" : SGDClassifier(loss='hinge', alpha=0.0001),
-		"SGD2" : SGDClassifier(loss='log', alpha=0.0001),
-		"SGD3" : SGDClassifier(loss='hinge', alpha=0.001),
-		"SGD4" : SGDClassifier(loss='hinge', alpha=0.00001)
+	sgd_models = {
+		"SGD1" : {
+			"model" : None,
+			"scores" : {
+				"accuracy" : [],
+				"precision" : [],
+				"recall" : [],
+				"f1" :  []
+			}
+		},
+		"SGD2" : {
+			"model" : None,
+			"scores" : {
+				"accuracy" : [],
+				"precision" : [],
+				"recall" : [],
+				"f1" :  []
+			}
+		},
+		"SGD3" : {
+			"model" : None,
+			"scores" : {
+				"accuracy" : [],
+				"precision" : [],
+				"recall" : [],
+				"f1" :  []
+			}
+		},
+		"SGD4" : {
+			"model" : None,
+			"scores" : {
+				"accuracy" : [],
+				"precision" : [],
+				"recall" : [],
+				"f1" :  []
+			}
+		}
 	}
-
-	#call the process method on each rdd of the Dstream
-	lines.foreachRDD(process)
 	
+	for cls_name in sgd_models :
+		sgd_models[cls_name]["model"] = joblib.load(f"{cls_name}.pkl")
+		
+	
+
+	lines.foreachRDD(process)
+
+
 
 	ssc.start()
-	
-	
-	# wait for streaming to finish
-	ssc.awaitTermination(timeout=60*20)
+	ssc.awaitTermination(timeout=60*5)
 	
 	ssc.stop(stopGraceFully=True)
 	
-	
-	for cls_name, cls in sgd_classifiers.items():
-		joblib.dump(cls, f"{cls_name}.pkl")
-		print(f"{cls_name} saved successfully!!!")
-		
-	
+	print(X_test_complete.shape)
 	
 	
